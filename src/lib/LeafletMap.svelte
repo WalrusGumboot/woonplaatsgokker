@@ -1,16 +1,44 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
+    import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { browser } from '$app/environment';
 
-    import omtrek from '$lib/grens.json';
-    import gemeentes from '$lib/gemeentes.json';
+    const dispatch = createEventDispatcher();
 
+    import gok_icoon from "$lib/gok_icoon.png";
+    import plaats_icoon from "$lib/plaats_icoon.png";
+
+    import grens from '$lib/grens.json';
+    let gemeentes;
+    
     let mapElement;
     let map;
+    
+    let huidigeGemeente;
+    let gezieneGemeentes = [];
 
+    const maxAfstandInMeter = 289380; // grootste afstand die je kunt afleggen in belgie
+
+    function laadPlaats() {
+        huidigeGemeente = gemeentes[Math.floor(Math.random() * gemeentes.length)]
+        dispatch("nieuweGemeente", huidigeGemeente);
+    }
+
+    function berekenScore(afstand) {
+        return Math.round(449.972 - (449.972 / (1 + Math.exp(-(afstand-26000)/12500))))
+    }
+    
     onMount(async () => {
         if(browser) {
+            gemeentes = (await import('$lib/gemeentes.json')).features;
             const leaflet = await import('leaflet');
+            const Proj = await import("proj4leaflet");
+
+            const gok_marker = new leaflet.Icon({iconUrl: gok_icoon, iconSize: [20, 20]})
+            const plaats_marker = new leaflet.Icon({iconUrl: plaats_icoon, iconSize: [20, 20]})
+
+            laadPlaats()
+
+            const projectie = new Proj.CRS("EPSG:3812", "+proj=lcc +lat_0=50.797815 +lon_0=4.35921583333333 +lat_1=49.8333333333333 +lat_2=51.1666666666667 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
 
             map = leaflet.map(mapElement, {
                 center: [50.641111, 4.668056],
@@ -23,19 +51,38 @@
                 scrollWheelZoom: false,
                 touchZoom: false,
             });
-            leaflet.geoJSON(omtrek, {
+            let belgië = leaflet.geoJSON(grens, {
                     style: {
-                        color: '#6d6d6d',
-                        weight: 1,
+                        weight: 0,
                         fillColor: '#efefef',
                         fillOpacity: 1
                     }
-                }).addTo(map);
+                });
 
-            leaflet.geoJSON(gemeentes).addTo(map);
-            // Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            //     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            // }).addTo(map);
+            belgië.on("click", (event) => {
+                console.log(event.latlng)
+                let coords = huidigeGemeente.geometry.coordinates;
+                let point = new leaflet.Point(coords[0], coords[1]);
+                console.log(point)
+
+                let plaatsLatLng = projectie.unproject(point);
+
+                let eigenMarker = new leaflet.Marker(event.latlng, {icon: gok_marker})
+                let plaatsMarker = new leaflet.Marker(plaatsLatLng, {icon: plaats_marker})
+
+                eigenMarker.addTo(map)
+                plaatsMarker.addTo(map)
+
+                let polyline = new leaflet.Polyline([event.latlng, plaatsLatLng])
+
+                polyline.addTo(map);
+
+                dispatch("meerScore", {pluspunten: berekenScore(plaatsLatLng.distanceTo(event.latlng))})
+                
+                laadPlaats()
+            })
+            
+            belgië.addTo(map);
         }
     });
 
@@ -49,7 +96,7 @@
 
 
 <main>
-    <div bind:this={mapElement}></div>
+    <div bind:this={mapElement} class="h-16 p-32"></div>
 </main>
 
 <style>

@@ -13,6 +13,7 @@
 		"autoprefixer": "^10.4.14",
 		"leaflet": "^1.9.4",
 		"postcss": "^8.4.24",
+		"proj4leaflet": "^1.0.2",
 		"svelte": "^3.54.0",
 		"tailwindcss": "^3.3.2",
 		"vite": "^4.3.0"
