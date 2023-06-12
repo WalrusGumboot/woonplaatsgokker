@@ -16,25 +16,49 @@
     let huidigeGemeente;
     let gezieneGemeentes = [];
 
+    let leaflet;
+
+    let waargenomenStront;
+
+    export let actief = true;
+
     const maxAfstandInMeter = 289380; // grootste afstand die je kunt afleggen in belgie
 
     function laadPlaats() {
-        huidigeGemeente = gemeentes[Math.floor(Math.random() * gemeentes.length)]
+        let nieuweIdx = -1;
+
+        do {
+            nieuweIdx = Math.floor(Math.random() * gemeentes.length);
+        } while (gezieneGemeentes.includes(nieuweIdx));
+
+
+
+        huidigeGemeente = gemeentes[nieuweIdx];
+        gezieneGemeentes.push(nieuweIdx);
         dispatch("nieuweGemeente", huidigeGemeente);
     }
 
     function berekenScore(afstand) {
         return Math.round(449.972 - (449.972 / (1 + Math.exp(-(afstand-26000)/12500))))
     }
+
+    export const resetKaart = () => {
+        waargenomenStront.clearLayers();
+        gezieneGemeentes = [];
+        laadPlaats();
+    }
     
     onMount(async () => {
         if(browser) {
             gemeentes = (await import('$lib/gemeentes.json')).features;
-            const leaflet = await import('leaflet');
+            leaflet = await import('leaflet');
             const Proj = await import("proj4leaflet");
 
-            const gok_marker = new leaflet.Icon({iconUrl: gok_icoon, iconSize: [20, 20]})
-            const plaats_marker = new leaflet.Icon({iconUrl: plaats_icoon, iconSize: [20, 20]})
+            waargenomenStront = new leaflet.LayerGroup();
+
+
+            const gok_marker = new leaflet.Icon({iconUrl: gok_icoon, iconSize: [16, 16]})
+            const plaats_marker = new leaflet.Icon({iconUrl: plaats_icoon, iconSize: [16, 16]})
 
             laadPlaats()
 
@@ -53,31 +77,40 @@
             });
             let belgië = leaflet.geoJSON(grens, {
                     style: {
-                        weight: 0,
-                        fillColor: '#efefef',
+                        color: "#3e3e3e",
+                        weight: 1,
+                        fillColor: '#ffffff',
                         fillOpacity: 1
                     }
                 });
 
+            waargenomenStront.addTo(map)
+
             belgië.on("click", (event) => {
-                console.log(event.latlng)
+                if (!actief) {return;}
+
+
                 let coords = huidigeGemeente.geometry.coordinates;
                 let point = new leaflet.Point(coords[0], coords[1]);
-                console.log(point)
 
                 let plaatsLatLng = projectie.unproject(point);
 
-                let eigenMarker = new leaflet.Marker(event.latlng, {icon: gok_marker})
-                let plaatsMarker = new leaflet.Marker(plaatsLatLng, {icon: plaats_marker})
+                let eigenMarker = new leaflet.Marker(event.latlng, {icon: gok_marker, interactive: false})
+                let plaatsMarker = new leaflet.Marker(plaatsLatLng, {icon: plaats_marker, interactive: false})
 
-                eigenMarker.addTo(map)
-                plaatsMarker.addTo(map)
+                eigenMarker.addTo(waargenomenStront)
+                plaatsMarker.addTo(waargenomenStront)
 
-                let polyline = new leaflet.Polyline([event.latlng, plaatsLatLng])
+                let polyline = new leaflet.Polyline([event.latlng, plaatsLatLng], {interactive: false})
 
-                polyline.addTo(map);
+                polyline.addTo(waargenomenStront);
 
-                dispatch("meerScore", {pluspunten: berekenScore(plaatsLatLng.distanceTo(event.latlng))})
+                let afstand = plaatsLatLng.distanceTo(event.latlng);
+
+                dispatch("meerScore", {
+                    pluspunten: berekenScore(afstand),
+                    afstand: (afstand/1000).toFixed(2)
+                })
                 
                 laadPlaats()
             })
@@ -104,5 +137,6 @@
     main div {
         width: 800px;
         height: 800px;
+        background: none !important;
     }
 </style>

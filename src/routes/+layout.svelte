@@ -8,4 +8,10 @@
         crossorigin=""/>
 </svelte:head>
 
-<slot />
+<div class="p-6 flex flex-col">
+    <div class=" mb-8 p-6 rounded-md bg-white shadow-md flex flex-row justify-between">
+        <a class="text-2xl font-bold" href="/">woonplaatsgokker</a>
+        <a class="underline text-xl" href="/over">over dit spel</a>
+    </div>
+    <slot />
+</div>
